@@ -1,0 +1,7 @@
+name = "speed-search"
+compatibility_date = "2025-06-28"
+
+[vars]
+UPSTASH_REDIS_URL = ""
+UPSTASH_REDIS_TOKEN = ""
+NEON_DB_CONNECTION_STRING = ""

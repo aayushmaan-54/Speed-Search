@@ -1,103 +1,139 @@
-import Image from "next/image";
+"use client";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import PostgreSQL from "@/icons/postgreSql.icon";
+import Redis from "@/icons/redis.icon";
+import { cn } from "@/lib/utils";
+import { CommandList } from "cmdk";
+import { useEffect, useState } from "react";
+import { useDebounce } from 'use-debounce';
 
-export default function Home() {
+
+
+export default function HomePage() {
+  const [inputValue, setInputValue] = useState<string>('');
+  const [selectedEngine, setSelectedEngine] = useState<'redis' | 'postgresql'>('postgresql');
+  const [searchResults, setSearchResults] = useState<{
+    result: string[];
+    duration: number;
+  }>();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [debouncedInputValue] = useDebounce(inputValue, 300);
+
+
+  useEffect(() => {
+    setSearchResults(undefined);
+  }, [selectedEngine]);
+
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (debouncedInputValue.trim() === '') {
+        setSearchResults(undefined);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/${selectedEngine}?q=${encodeURIComponent(debouncedInputValue)}`);
+        if (!res.ok) {
+          throw new Error('Something went wrong!');
+        }
+        const data = (await res.json()) as { result: string[]; duration: number };
+        setSearchResults(data);
+      } catch (e) {
+        console.error("Error: ", e);
+        if (e instanceof Error) setError(e.message);
+        setSearchResults(undefined);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [debouncedInputValue, selectedEngine]);
+
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <>
+      <main className="h-screen w-screen flex flex-col gap-6 items-center pt-32 grainy">
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+        <h1 className="sm:text-5xl text-4xl tracking-tight font-black">⚡ Speed Search</h1>
+        <p className="text-zinc-500 text-lg max-w-prose text-center">
+          Blazing fast country search powered by Redis, Hono, and Cloudflare Workers — right at the edge.
+        </p>
+
+        <div className="max-w-md w-full">
+          <Command>
+            <CommandInput
+              placeholder="Search for a country..."
+              value={inputValue}
+              onValueChange={setInputValue}
+              className="placeholder:text-zinc-500"
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+
+            <CommandList className="max-h-[35vh] overflow-y-auto">
+              {loading && <CommandEmpty>Loading...</CommandEmpty>}
+              {error && <CommandEmpty className="text-red-500 p-2 rounded-md">{error}</CommandEmpty>}
+              {!loading && !error && searchResults?.result.length === 0 ? (
+                <CommandEmpty>
+                  No results found.
+                </CommandEmpty>
+              ) : null}
+
+              {searchResults?.result ? (
+                <p className="p-2 text-xs text-zinc-500 border-b">
+                  Found {searchResults.result.length} results in {searchResults.duration.toFixed(2)}ms
+                </p>
+              ) : null}
+
+              {searchResults?.result ? (
+                <CommandGroup heading="Results">
+                  {searchResults?.result.map((country, index) => (
+                    <CommandItem
+                      key={index}
+                      value={country}
+                      onSelect={setInputValue}
+                    >
+                      {country}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ) : null}
+            </CommandList>
+          </Command>
         </div>
+
+        <div className="flex flex-col items-center gap-4 mt-14">
+          <span className="flex items-center gap-10 bg-zinc-300 p-4 rounded-lg">
+            <div
+              className={cn(
+                "p-2 rounded-md transition-all duration-150",
+                selectedEngine === 'postgresql' && 'bg-white'
+              )}
+              onClick={() => setSelectedEngine('postgresql')}
+            >
+              <PostgreSQL className="size-10 hover:scale-110 transition-all duration-350" />
+            </div>
+            <div
+              className={cn(
+                "p-2 rounded-md transition-all duration-350",
+                selectedEngine === 'redis' && 'bg-white'
+              )}
+              onClick={() => setSelectedEngine('redis')}
+            >
+              <Redis className="size-10 hover:scale-110 transition-all duration-350" />
+            </div>
+          </span>
+          <p className="text-lg text-zinc-500">
+            Query Backend: <span className="font-bold">{selectedEngine === 'redis' ? 'Redis' : 'PostgreSQL'}</span>
+          </p>
+        </div>
+
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    </>
   );
 }
