@@ -11,7 +11,10 @@ const app = new Hono().basePath('/api');
 
 
 
-app.use('/*', cors());
+app.use('/*', cors({
+  origin: [process.env.NEXT_PUBLIC_FRONTEND_URL as string],
+  allowMethods: ['GET'],
+}));
 
 app.get('/search/redis', async (c) => {
   try {
